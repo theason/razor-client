@@ -13,6 +13,15 @@ module Razor::CLI
     def nested(nested_obj)
       (nested_obj.nil? or nested_obj.empty?) ? '(none)' : nested_obj.to_s
     end
+    def nested_val_ip(nested_obj)
+      (nested_obj.nil? or nested_obj.empty?) ? '(none)' : nested_obj['ipaddress'].to_s
+    end
+    def nested_val_lldp(nested_obj)
+      (nested_obj.nil? or nested_obj.empty?) ? '(none)' : nested_obj['lldp_neighbor_portid_eno1'].to_s
+    end
+    def nested_val(nested_obj)
+      (nested_obj.nil? or nested_obj.empty?) ? '(none)' : nested_obj['serialnumber'].to_s
+    end
     def shallow_hash(hash)
       (hash.nil? or hash.empty?) ? '(none)' :
           hash.map {|key, val| "#{key}: #{val}"}.join(', ')
