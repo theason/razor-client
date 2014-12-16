@@ -35,8 +35,15 @@ collections:
       +layout: table
       +show:
         name:
-        dhcp_mac:
-          +format: mac
+        ipaddress:
+          +column: facts
+          +format: nested_val_ip
+        serial:
+          +column: facts
+          +format: nested_val
+        port:
+          +column: facts
+          +format: nested_val_lldp
         tags:
           +format: join_names
         policy:
@@ -54,6 +61,8 @@ collections:
           state:
           last_checkin:
             +format: if_present
+          facts:
+            +format: select_name
           metadata:
             +format: if_present
           tags:
