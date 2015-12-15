@@ -19,7 +19,7 @@ describe Razor::CLI::Parse do
   describe "#new" do
     context "with no arguments" do
       it {parse.show_help?.should be true}
-      it {parse.verify_ssl?.should be true}
+      it {parse.verify_ssl?.should be false}
     end
 
     context "with a '-h'" do
@@ -54,6 +54,12 @@ describe Razor::CLI::Parse do
       it "should use the given URL" do
         url = 'http://razor.example.com:2150/path/to/api'
         parse('-u',url).api_url.to_s.should == url
+        parse('-u',url).verify_ssl?.should == true
+      end
+
+      it "should respect insecure requests" do
+        url = 'http://razor.example.com:2150/path/to/api'
+        parse('-u',url,'-k').verify_ssl?.should be false
       end
 
       it "should terminate with an error if an invalid URL is provided" do
@@ -61,7 +67,7 @@ describe Razor::CLI::Parse do
       end
 
       it "should terminate with an error if a URL without a protocol is provided" do
-        expect{parse('-u','localhost:8080/api')}.to raise_error(Razor::CLI::InvalidURIError)
+        expect{parse('-u','localhost:8151/api')}.to raise_error(Razor::CLI::InvalidURIError)
       end
     end
 
@@ -79,6 +85,16 @@ describe Razor::CLI::Parse do
 
     context "with a '--insecure'" do
       it {parse("--insecure").verify_ssl?.should be false}
+    end
+
+    context "with '--version'" do
+      it {parse("--version").show_version?.should be true}
+    end
+
+    context "with '--version' and no reachable server" do
+      subject { parse("--version", '-u', 'https://localhost:9999999/api').version.first }
+      it { should =~ /Razor Server version: \(unknown\)/ }
+      it { should =~ /Razor Client version: #{Razor::CLI::VERSION}/ }
     end
 
     context "with ENV RAZOR_API set" do
@@ -101,16 +117,30 @@ describe Razor::CLI::Parse do
       end
     end
 
+    context "with ENV RAZOR_CA_FILE set" do
+      after :each do
+        ENV::delete('RAZOR_CA_FILE')
+      end
+      it "should raise an error if the RAZOR_CA_FILE override is invalid" do
+        ENV['RAZOR_CA_FILE'] = '/does/not/exist'
+        expect{parse}.to raise_error(Razor::CLI::InvalidCAFileError,
+            "CA file '/does/not/exist' in ENV variable RAZOR_CA_FILE does not exist")
+      end
+    end
+
     describe "#help", :vcr do
       subject(:p) {parse}
       it { should respond_to :help}
 
-      it { p.help.should be_a String}
+      it { output, exitcode = p.help
+           output.should be_a String
+           exitcode.should == 0}
 
       it "should print a list of known endpoints" do
         p.navigate.should_receive(:collections).and_return([])
         p.navigate.should_receive(:commands).and_return([])
-        p.help
+        _, exitcode = p.help
+        exitcode.should == 0
       end
     end
   end

@@ -42,6 +42,13 @@ module Razor::CLI
     def name_if_present(obj)
       obj ? obj['name'] : "---"
     end
+    def name_or_whole(obj)
+      if obj
+        (obj['name'] ? obj['name'] : obj)
+      else
+        '---'
+      end
+    end
     def count_column(hash)
       hash['count']
     end
@@ -53,17 +60,22 @@ module Razor::CLI
     end
     def event_msg(obj)
       raise Razor::CLI::HideColumnError if obj['msg'].nil?
-      obj['msg'][0..50] + ('...' if obj['msg'].size > 50) if obj['msg']
+      obj['msg'].to_s[0..50] + (obj['msg'].to_s.size > 50 ? '...' : '')
     end
     def full_event_msg(obj)
       raise Razor::CLI::HideColumnError if obj['msg'].nil?
       obj['msg']
     end
     def event_entities(hash)
+      hash ||= {}
       shallow_hash(Hash[hash].keep_if {|k,_| ['task', 'policy', 'broker', 'repo', 'node', 'command'].include?(k)})
     end
     def event_misc(hash)
+      hash ||= {}
       shallow_hash(Hash[hash].delete_if {|k,_|['task', 'policy', 'broker', 'repo', 'node', 'msg', 'command'].include?(k)})
+    end
+    def node_log_entry(hash)
+      shallow_hash(Hash[hash].delete_if {|k,_|['event', 'timestamp', 'severity'].include?(k)})
     end
   end
 end

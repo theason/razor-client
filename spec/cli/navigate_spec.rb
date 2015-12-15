@@ -128,6 +128,31 @@ describe Razor::CLI::Navigate do
     it "should allow '=' in string" do
       Razor::CLI::Parse.new(['create-repo', '--name=\'with=equals\'', '--url', 'http://url.com/some.iso', '--task', 'noop']).navigate.get_document['name'].should =~ /with=equals/
     end
+
+    it "should not allow double-dash with single character flag" do
+      nav = Razor::CLI::Parse.new(['create-broker', '--name=some-broker', '--broker-type', 'puppet-pe', '--c', 'server=abc.com']).navigate
+      expect{nav.get_document}.to raise_error(ArgumentError, 'Unexpected argument --c (did you mean -c?)')
+    end
+    it "should not allow single-dash with multiple character flag" do
+      nav = Razor::CLI::Parse.new(['create-broker', '--name=some-broker', '-broker-type', 'puppet-pe']).navigate
+      expect{nav.get_document}.to raise_error(ArgumentError, 'Unexpected argument -broker-type (did you mean --broker-type?)')
+    end
+    it "should allow single-dash with single character flag" do
+      Razor::CLI::Parse.new(['create-broker', '--name=some-broker', '--broker-type', 'puppet-pe', '-c', 'server=abc.com']).navigate.get_document['configuration']['server'].should == 'abc.com'
+    end
+  end
+
+  context "positional arguments", :vcr do
+    it "should allow the use of positional arguments" do
+      Razor::CLI::Parse.new(['create-broker', 'some noop broker', 'noop']).navigate.get_document['name'].should == 'some noop broker'
+      Razor::CLI::Parse.new(['create-broker', 'some other broker', '--broker-type', 'noop']).navigate.get_document['name'].should == 'some other broker'
+      Razor::CLI::Parse.new(['delete-broker', 'some noop broker']).navigate.get_document['result'].should == 'broker some noop broker destroyed'
+      Razor::CLI::Parse.new(['delete-broker', 'some other broker']).navigate.get_document['result'].should == 'broker some other broker destroyed'
+    end
+    it "should fail with too many positional arguments" do
+      nav = Razor::CLI::Parse.new(['create-broker', 'some noop broker', 'noop', 'extra']).navigate
+      expect{nav.get_document}.to raise_error(ArgumentError, 'Unexpected argument extra')
+    end
   end
 
   context "for command help", :vcr do
@@ -148,7 +173,7 @@ describe Razor::CLI::Navigate do
   end
 
   context "with authentication", :vcr do
-    AuthArg = %w[-u http://fred:dead@localhost:8080/api].freeze
+    AuthArg = %w[-u http://fred:dead@localhost:8150/api].freeze
 
     it "should supply that to the API service" do
       nav = Razor::CLI::Parse.new(AuthArg).navigate
@@ -167,29 +192,29 @@ describe Razor::CLI::Navigate do
 
   context "with query parameters", :vcr do
     it "should append limit" do
-      nav = Razor::CLI::Parse.new(%w[-u http://fred:dead@localhost:8080/api events --limit 1]).navigate
+      nav = Razor::CLI::Parse.new(%w[-u http://fred:dead@localhost:8150/api events --limit 1]).navigate
       nav.get_document.should be_an_instance_of Hash
       nav.last_url.to_s.should =~ /limit=1/
     end
     it "should append start" do
-      nav = Razor::CLI::Parse.new(%w[-u http://fred:dead@localhost:8080/api events --start 1]).navigate
+      nav = Razor::CLI::Parse.new(%w[-u http://fred:dead@localhost:8150/api events --start 1]).navigate
       nav.get_document.should be_an_instance_of Hash
       nav.last_url.to_s.should =~ /start=1/
     end
     it "should throw an error if the query parameter is not in the API" do
-      nav = Razor::CLI::Parse.new(%w[-u http://fred:dead@localhost:8080/api events --not-in-api 1]).navigate
+      nav = Razor::CLI::Parse.new(%w[-u http://fred:dead@localhost:8150/api events --not-in-api 1]).navigate
       expect {nav.get_document}.to raise_error(OptionParser::InvalidOption, 'invalid option: --not-in-api')
     end
     it "should not fail when query returns details for one item" do
       nav = Razor::CLI::Parse.new(['register-node', '--installed', 'true', '--hw-info', 'net0=78:31:c1:be:c8:00']).navigate.get_document
       name = nav['name']
-      nav = Razor::CLI::Parse.new(['-u', 'http://fred:dead@localhost:8080/api', 'nodes', name]).navigate
+      nav = Razor::CLI::Parse.new(['-u', 'http://fred:dead@localhost:8150/api', 'nodes', name]).navigate
       nav.get_document['name'].should == name
     end
     it "should throw an error if the query parameter is not in the API from a single item" do
       nav = Razor::CLI::Parse.new(['register-node', '--installed', 'true', '--hw-info', 'net0=78:31:c1:be:c8:00']).navigate.get_document
       name = nav['name']
-      expect {Razor::CLI::Parse.new(['-u', 'http://fred:dead@localhost:8080/api', 'nodes', name, '--limit', '1']).
+      expect {Razor::CLI::Parse.new(['-u', 'http://fred:dead@localhost:8150/api', 'nodes', name, '--limit', '1']).
           navigate.get_document}.to raise_error(OptionParser::InvalidOption, 'invalid option: --limit')
     end
     it "should store query without query parameters" do
@@ -197,7 +222,7 @@ describe Razor::CLI::Navigate do
           navigate.get_document['name']
       Razor::CLI::Parse.new(['register-node', '--installed', 'true', '--hw-info', 'net0=78:31:c1:be:c8:01']).
           navigate.get_document
-      parse = Razor::CLI::Parse.new(['-u', 'http://fred:dead@localhost:8080/api', 'nodes', name, 'log', '--limit', '1'])
+      parse = Razor::CLI::Parse.new(['-u', 'http://fred:dead@localhost:8150/api', 'nodes', name, 'log', '--limit', '1'])
       parse.navigate.get_document
       parse.stripped_args.should == ['nodes', name, 'log']
     end

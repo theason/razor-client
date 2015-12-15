@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "razor-client"
-  spec.version       = "0.15.1"
+  spec.version       = "1.1.0"
   spec.authors       = ["Puppet Labs"]
   spec.email         = ["info@puppetlabs.com"]
   spec.description   = "The client for the Razor server"
@@ -18,7 +18,11 @@ Gem::Specification.new do |spec|
   spec.test_files    = spec.files.grep(%r{^spec/})
   spec.require_paths = ["lib"]
 
-  spec.required_ruby_version
+  # This is added until compatibility issues can be resolved in
+  # e.g. https://tickets.puppetlabs.com/browse/RAZOR-572. This is only
+  # effective for locally built gems, as project_data.yaml does not support
+  # this feature.
+  spec.required_ruby_version = '>= 1.9.2'
 
   # mime-types is a dependency of rest-client. We need to explicitly depend
   # on it and pin its version to make sure the gem works with Ruby 1.8.7

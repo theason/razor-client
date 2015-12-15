@@ -16,7 +16,7 @@ collections:
       +layout: table
       +show:
         name:
-        broker-type:
+        broker_type:
         configuration:
           +format: nested
         policies:
@@ -26,7 +26,7 @@ collections:
         +layout: list
         +show:
           name:
-          broker-type:
+          broker_type:
           configuration:
           policies:
             +format: count_column
@@ -35,15 +35,8 @@ collections:
       +layout: table
       +show:
         name:
-        ipaddress:
-          +column: facts
-          +format: nested_val_ip
-        serial:
-          +column: facts
-          +format: nested_val
-        port:
-          +column: facts
-          +format: nested_val_lldp
+        dhcp_mac:
+          +format: mac
         tags:
           +format: join_names
         policy:
@@ -59,10 +52,10 @@ collections:
           dhcp_mac:
             +format: mac
           state:
+          policy:
+            +format: select_name
           last_checkin:
             +format: if_present
-          facts:
-            +format: select_name
           metadata:
             +format: if_present
           tags:
@@ -84,10 +77,14 @@ collections:
     log:
       +short:
         +layout: table
-#        +show:
-#          event:
-#          task:
-#          timestamp:
+        +show:
+          name:
+          timestamp:
+          severity:
+          event:
+          entry:
+            +all-columns:
+            +format: node_log_entry
   policies:
     +short:
       +layout: table
@@ -210,6 +207,7 @@ collections:
       +show:
         name:
         timestamp:
+        severity:
         message:
           +column: entry
           +format: event_msg
@@ -224,6 +222,7 @@ collections:
         +show:
           name:
           timestamp:
+          severity:
           message:
             +column: entry
             +format: full_event_msg
@@ -236,8 +235,22 @@ collections:
           repo:
             +format: name_hide_nil
           command:
-            +format: name_hide_nil
+            +format: name_or_whole
           task:
             +format: name_hide_nil
           entry:
-            +format: event_misc
+  hooks:
+    +short:
+      +layout: table
+      +show:
+        name:
+        hook_type:
+        configuration:
+          +format: shallow_hash
+    member:
+      +short:
+        +show:
+          name:
+          hook_type:
+          configuration:
+

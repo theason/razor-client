@@ -3,6 +3,42 @@ require 'multi_json'
 require 'yaml'
 require 'forwardable'
 
+# Needed to make the client work on Ruby 1.8.7
+unless URI.respond_to?(:encode_www_form)
+  module URI
+    def self.encode_www_form_component(str)
+      str = str.to_s
+      if HTML5ASCIIINCOMPAT.include?(str.encoding)
+        str = str.encode(Encoding::UTF_8)
+      else
+        str = str.dup
+      end
+      str.force_encoding(Encoding::ASCII_8BIT)
+      str.gsub!(/[^*\-.0-9A-Z_a-z]/, TBLENCWWWCOMP_)
+      str.force_encoding(Encoding::US_ASCII)
+    end
+    def self.encode_www_form(enum)
+      enum.map do |k,v|
+        if v.nil?
+          encode_www_form_component(k)
+        elsif v.respond_to?(:to_ary)
+          v.to_ary.map do |w|
+            str = encode_www_form_component(k)
+            unless w.nil?
+              str << '='
+              str << encode_www_form_component(w)
+            end
+          end.join('&')
+        else
+          str = encode_www_form_component(k)
+          str << '='
+          str << encode_www_form_component(v)
+        end
+      end.join('&')
+    end
+  end
+end
+
 module Razor::CLI
   class Navigate
     extend Forwardable
@@ -57,7 +93,15 @@ module Razor::CLI
       elsif query?
         Razor::CLI::Query.new(@parse, self, collections, @segments).run
       elsif command?
-        Razor::CLI::Command.new(@parse, self, commands, @segments).run
+        cmd = @segments.shift
+        command = commands.find { |coll| coll["name"] == cmd }
+        cmd_url = URI.parse(command['id'])
+        # Ensure that we copy authentication data from our previous URL.
+        if @doc_resource
+          cmd_url = URI.parse(cmd_url.to_s)
+        end
+        command = json_get(cmd_url)
+        Razor::CLI::Command.new(@parse, self, command, @segments, cmd_url).run
       else
         raise NavigationError.new(@doc_resource, @segments, @doc)
       end
@@ -142,6 +186,7 @@ module Razor::CLI
     def create_resource(url, headers)
       @doc_resource = RestClient::Resource.new(url.to_s, :headers => headers,
                                          :verify_ssl => @parse.verify_ssl?,
+                                         :ssl_ca_file      =>  @parse.ssl_ca_file,
                                          :user => @username,
                                          :password => @password)
     end

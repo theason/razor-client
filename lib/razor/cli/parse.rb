@@ -2,11 +2,21 @@ require 'uri'
 require 'optparse'
 require 'forwardable'
 
+# Needed to make the client work on Ruby 1.8.7
+unless URI::Generic.method_defined?(:hostname)
+  module URI
+    def hostname
+      v = self.host
+      /\A\[(.*)\]\z/ =~ v ? $1 : v
+    end
+  end
+end
+
 module Razor::CLI
 
   class Parse
     extend Forwardable
-    DEFAULT_RAZOR_API = "http://localhost:8080/api"
+    DEFAULT_RAZOR_API = "http://localhost:8150/api"
 
     def_delegator 'navigate', 'query?'
 
@@ -53,14 +63,25 @@ module Razor::CLI
     end
 
     def version
-      <<-VERSION
-Razor Server version: #{navigate.server_version}
-Razor Client version: #{Razor::CLI::VERSION}
-      VERSION
+      server_version = '(unknown)'
+      error = ''
+      begin
+        server_version = navigate.server_version
+      rescue RestClient::Unauthorized
+        error = "Error: Credentials are required to connect to the server at #{@api_url}."
+      rescue
+        error = "Error: Could not connect to the server at #{@api_url}."
+      ensure
+        return [(<<-OUTPUT + "\n" + error).rstrip, error != '' ? 1 : 0]
+        Razor Server version: #{server_version}
+        Razor Client version: #{Razor::CLI::VERSION}
+        OUTPUT
+      end
     end
 
     def help
       output = get_optparse.to_s
+      exit = 0
       begin
         output << <<-HELP
 #{list_things("Collections", navigate.collections)}
@@ -80,13 +101,28 @@ HELP
         output << <<-UNAUTH
 Error: Credentials are required to connect to the server at #{@api_url}"
 UNAUTH
-      rescue
+        exit = 1
+      rescue SocketError, Errno::ECONNREFUSED => e
+        puts "Error: Could not connect to the server at #{@api_url}"
+        puts "       #{e}\n"
+        die
+      rescue RestClient::SSLCertificateNotVerified
+        puts "Error: SSL certificate could not be verified against known CA certificates."
+        puts "       To turn off verification, use the -k or --insecure option."
+        die
+      rescue OpenSSL::SSL::SSLError => e
+        # Occurs in case of e.g. certificate mismatch (FQDN vs. hostname)
+        puts "Error: SSL certificate error from server at #{@api_url}"
+        puts "       #{e}"
+        die
+      rescue => e
         output << <<-ERR
-Error: Could not connect to the server at #{@api_url}. More help is available after pointing
-the client to a Razor server
+Error: Unknown error occurred while connecting to server at #{@api_url}:
+       #{e}
 ERR
+        exit = 1
       end
-      output
+      [output, exit]
     end
 
     def show_version?
@@ -115,8 +151,10 @@ ERR
 
     attr_reader :api_url, :args
     # The format can be determined from later segments.
-    attr_accessor :format, :stripped_args
+    attr_accessor :format, :stripped_args, :ssl_ca_file
 
+    LINUX_PEM_FILE = '/etc/puppetlabs/puppet/ssl/certs/ca.pem'
+    WIN_PEM_FILE = 'C:\ProgramData\PuppetLabs\puppet\etc\ssl\certs\ca.pem'
     def initialize(args)
       parse_and_set_api_url(ENV["RAZOR_API"] || DEFAULT_RAZOR_API, :env)
       @args = args.dup
@@ -124,7 +162,26 @@ ERR
       @stripped_args = []
       @format = 'short'
       @verify_ssl = true
+      env_pem_file = ENV['RAZOR_CA_FILE']
+      # If this is set, it should actually exist.
+      if env_pem_file && !File.exists?(env_pem_file)
+        raise Razor::CLI::InvalidCAFileError.new(env_pem_file)
+      end
+      pem_file_locations = [env_pem_file, LINUX_PEM_FILE, WIN_PEM_FILE]
+      pem_file_locations.each do |file|
+        if file && File.exists?(file)
+          @ssl_ca_file = file
+          break
+        end
+      end
       @args = get_optparse.order(@args)
+
+      # Localhost won't match the server's certificate; no verification required.
+      # This needs to happen after get_optparse so `-k` and `-u` can take effect.
+      if @api_url.hostname == 'localhost'
+        @verify_ssl = false
+      end
+
       @args = set_help_vars(@args)
       if @args == ['version'] or @show_version
         @show_version = true

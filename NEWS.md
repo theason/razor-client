@@ -1,6 +1,33 @@
 # Razor Client Release Notes
 
-## 0.16.0 - 2014-11-24
+## Next - Next
+
+* BUGFIX: Fixed insecure flag when supplied in addition to a server URL.
+* IMPROVEMENT: Proper short form argument style is now followed.
+  Single-character arguments now require a single dash, e.g. `-c`.
+* IMPROVEMENT: Error messaging for SSL issues has been improved.
+
+## 1.1.0 - 2015-11-12
+
+* IMPROVEMENT: By default, `razor` will point to port 8150.
+* IMPROVEMENT: Better display of several views/collections.
+
+## 1.0.0 - 2015-06-08
+
+* NEW: Fit collection output to STDIN size for easier viewing.
+* NEW: RAZOR_CA_FILE environment variable allows TLS/SSL certificate
+  verification for requests.
+* NEW: The default API protocol and port are HTTPS over TLS/SSL on port 8151.
+* NEW: Utilizes `aliases` property in command metadata to better guess datatypes
+  for aliases.
+* IMPROVEMENT: `razor hooks` now displays as a table.
+* IMPROVEMENT: Better output for `razor events ##`.
+* IMPROVEMENT: Exits with an error code of 1 when a `razor` command fails.
+* BUGFIX: `razor events` no longer causes exception.
+* BUGFIX: `razor commands ## errors` no longer causes exception.
+* BUGFIX: Hook output message can now be any datatype.
+
+## 0.16.0 - 2015-01-05
 
 * BUGFIX: Commands were not always including authentication
   information in every request.
